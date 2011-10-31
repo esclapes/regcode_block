@@ -1,0 +1,5 @@
+name = Registration code block
+description = Block for validating registration codes based on an email address
+dependencies[] = regcode
+package = Registration
+core = 6.x

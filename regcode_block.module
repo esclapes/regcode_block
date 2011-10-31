@@ -1,0 +1,198 @@
+<?php
+
+/**
+ * @file
+ * Module for providing a block that allows annonymous and authenticated 
+ * users to validate registration codes based on their email address
+ */
+
+/**
+ * Implementation of hook_menu().
+ */
+function regcode_block_menu() { 
+
+  $items['admin/user/regcode/block'] = array(
+    'title' => 'Registration code block',
+    'description' => 'Settings for registration code block',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('regcode_voucher_admin'), 
+    'access arguments' => array('administer registration codes'),
+    'weight' => 25,
+    'type' => MENU_LOCAL_TASK,
+  );
+
+  return $items;
+}
+
+
+/**
+ * Implementation of hook_block().
+ */
+function regcode_block_block($op = 'list', $delta = 0, $edit = array()) {
+  switch ($op) {
+
+    case 'list':
+      $blocks[0]['info'] = t('Registration code block');
+      return $blocks;
+
+    case 'view':
+      if ($delta == 0) {
+        $block['subject'] = t('Resitration code');
+        $block['content'] = drupal_get_form('regcode_block');
+      }
+
+      return $block;
+  }    
+}
+
+
+/**
+ * Form builder for the regcode_block
+ */
+
+function regcode_block(){
+  global $user;
+
+  if ($user->uid == 0) {
+    $email_disabled = FALSE;
+  }else {
+    $email_disabled = TRUE;    
+  }
+
+  $form = array();
+
+  $form['regcode_block_introtext'] = array(
+    '#type'        => 'markup',
+    '#value'       => t('Enter your email address and registration code'),
+  );
+  
+  $form['regcode_block_mail'] = array('#type' => 'textfield',
+    '#title' => t('E-mail address'),
+    
+    '#maxlength' => EMAIL_MAX_LENGTH,
+    '#description' => t('Please enter a valid email address'),
+    '#required' => TRUE,
+    '#disabled' => $email_disabled,  
+  );
+  
+  // We change the help text for loged in user to be able to logout.
+  
+  if($email_disabled){
+    $destination = drupal_get_destination();
+    $form['regcode_block_mail']['#description'] = t('If this is not your email address, please <a href="@log-out">log out</a> or <a href="@edit-account">edit your account</a>', array('@log-out' => url('logout'), '@edit-account' => url('user/' . $user->uid . '/edit', array('query' => $destination)))); 
+    $form['regcode_block_mail']['#value'] = $user->mail;
+  }
+
+  $form['regcode_block_code'] = array(
+    '#type'        => 'textfield',
+    '#title'       => t('Registration Code'),
+    '#description' => t('Please enter your registration code.'),
+    '#required'    => TRUE,
+  );
+
+  $form['regcode_block_submit'] = array(
+    '#type'        => 'submit',
+    '#value'       => t('Submit'),
+  );
+
+  return $form;
+}
+
+
+/*
+ * Form validation for regcode_block
+ */
+function regcode_block_validate($form, $form_state) {
+  $mail = $form_state['values']['regcode_block_mail'];
+  $regcode = $form_state['values']['regcode_block_code'];
+
+// Validate the email address  
+  if (!valid_email_address($mail)) {
+    form_set_error('regcode_block_mail', 'Please insert a valid email address');
+  }
+
+// We validate the code using regcode_use function provided by regcode
+  $code = regcode_use($regcode);
+  if (!is_object($code)) {
+    form_set_error('regcode_block_code', regcode_errormsg($code));
+    watchdog('regcode', 'User entered invalid registration code (@code)', array('@code' => $edit['regcode_code']), WATCHDOG_WARNING);
+  }
+}
+
+
+/*
+ * If validation of email and code is correct we submit the regcode_block form
+ */
+
+function regcode_block_submit($form, $form_state) {
+  global $user;
+  $edit['regcode_code'] = $form_state['values']['regcode_block_code'];
+  $mail = $form_state['values']['regcode_block_mail'];
+  $user_exist = FALSE;
+  
+// If the user is annonymous we check if there is a user with the email provided
+  if ($user->uid == 0){
+    $user_exist = user_load(array('mail' => $mail));//returns false if user does not exist
+    dsm('usuario anónimo');
+    if ($user_exist == FALSE) {
+      // TODO: Not sure if this is the best way to create a new user, we should probably do it with hook_user
+      // We need a username to create a new user: this is taken from email_registration module
+      // Default implementation of name generation 
+      $namenew = preg_replace('/@.*$/', '', $mail);
+      // Remove unwanted characters
+      $namenew = preg_replace('/[^a-zA-Z0-9.-]/', '', $namenew);
+
+      // if username generated from email record already exists, append underscore and number eg:(chris_123)
+      if (db_result(db_query("SELECT count(*) FROM {users} WHERE uid <> %d AND LOWER(name) = LOWER('%s')", $account->uid, $namenew)) > 0) {
+        // find the next number available to append to the name
+        $sql = "SELECT SUBSTRING_INDEX(name,'_',-1) FROM {users} WHERE name REGEXP '%s' ORDER BY CAST(SUBSTRING_INDEX(name,'_',-1) AS UNSIGNED) DESC LIMIT 1";
+        $nameidx = db_result(db_query($sql, '^' . $namenew . '_[0-9]+$'));
+        $namenew .= '_' . ($nameidx + 1);
+      }
+
+      $userfields = array('name' => $namenew,
+          'pass' => user_password(),
+          'mail' => $mail,
+          'status' => 1,);
+      $newuser = user_save('', $userfields, 'account');
+      // Terminate if an error occured during user_save().
+      if (!$newuser) {
+        drupal_set_message(t("Error saving user account."), 'error');
+        $form_state['redirect'] = '';
+        return;
+      }
+      dsm('no existe usuario con este mail, se ha creado');
+      // TODO: Enviar mail de nueva cuenta creada
+      // TODO: mostrar mensaje de nueva cuentra creada
+    }
+    else {
+      $account = $user_exist;
+      dsm('exite usuario asociado a este mail');
+    }
+  }
+  else{
+    $account = $user;
+    dsm('usuario autentificado');
+  }
+  
+// We use the helper function provided by regcode so all the hooks are called properly
+  $code = regcode_use_helper($edit, $account);
+  if (is_object($code)) {
+    drupal_set_message(variable_get('regcode_voucher_message', t('Voucher code used successfully.')));
+  }
+}
+
+/**
+ * Implementation of hook_form_alter().
+ */
+function regcode_block_form_alter(&$form, &$form_state, $form_id) {
+// dsm($form);  
+
+// TODO ocultar en /user/register el campo de código promocional
+  if($form_id == 'user_register'){
+    dsm($form);
+  }
+}
+
+
+
