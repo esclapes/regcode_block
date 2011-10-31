@@ -9,8 +9,6 @@ projects[admin_menu][version] = "1.8"
 
 projects[devel][version] = "1.26"
 
-projects[module_builder][version] = "2.x-dev"
-
 projects[rules][version] = "1.4"
 
 projects[userpoints][version] = "1.2"
