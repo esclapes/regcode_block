@@ -167,8 +167,9 @@ function regcode_block_submit($form, $form_state) {
       $newuser->password = $pass; // psw in pain text for email
       $params['account'] = $newuser;
       $language = NULL;
-      
-      drupal_mail('user', 'register_no_approval_required', $language, $params);
+      dpm($newuser);
+      dpm($params);
+      drupal_mail('user', 'register_no_approval_required', $newuser->mail, $language, $params);
       
       drupal_set_message(t('Your password and further instructions have been sent to your e-mail address'), 'status');
       watchdog('regcode_block', 'Account with uid = @uid has been created to validate a code', array('@uid' => $newuser->uid), 'WATCHDOG_NOTICE', url('user/' . $newuser->uid));
@@ -201,5 +202,6 @@ function regcode_block_form_alter(&$form, &$form_state, $form_id) {
 // TODO ocultar en /user/register el campo de código promocional
   if($form_id == 'user_register'){
     dpm($form);
+    unset($form['regcode']);
   }
 }
