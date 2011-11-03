@@ -79,7 +79,7 @@ function regcode_block(){
   
   if($email_disabled){
     $destination = drupal_get_destination();
-    $form['regcode_block_mail']['#description'] = t('If this is not your email address, please <a href="@log-out">log out</a> or <a href="@edit-account">edit your account</a>', array('@log-out' => url('logout'), '@edit-account' => url('user/' . $user->uid . '/edit', array('query' => $destination)))); 
+    $form['regcode_block_mail']['#description'] = t('If this is not your email address, please <a href="@log-out">log out</a> or <a href="@edit-account">edit your account</a>', array('@log-out' => url('logout', array('query' => $destination)), '@edit-account' => url('user/' . $user->uid . '/edit', array('query' => $destination)))); 
     $form['regcode_block_mail']['#value'] = $user->mail;
   }
 
@@ -133,15 +133,15 @@ function regcode_block_submit($form, $form_state) {
 // If the user is annonymous we check if there is a user with the email provided
   if ($user->uid == 0){
     $user_exist = user_load(array('mail' => $mail));//returns false if user does not exist
+    //TODO: quitar esto
     dsm('usuario anónimo');
     if ($user_exist == FALSE) {
-      // TODO: Not sure if this is the best way to create a new user, we should probably do it with hook_user
+      // We create a user when no user has that email
       // We need a username to create a new user: this is taken from email_registration module
       // Default implementation of name generation 
       $namenew = preg_replace('/@.*$/', '', $mail);
       // Remove unwanted characters
       $namenew = preg_replace('/[^a-zA-Z0-9.-]/', '', $namenew);
-
       // if username generated from email record already exists, append underscore and number eg:(chris_123)
       if (db_result(db_query("SELECT count(*) FROM {users} WHERE uid <> %d AND LOWER(name) = LOWER('%s')", $account->uid, $namenew)) > 0) {
         // find the next number available to append to the name
@@ -149,29 +149,39 @@ function regcode_block_submit($form, $form_state) {
         $nameidx = db_result(db_query($sql, '^' . $namenew . '_[0-9]+$'));
         $namenew .= '_' . ($nameidx + 1);
       }
-
+      
+      $pass = user_password();
       $userfields = array('name' => $namenew,
-          'pass' => user_password(),
+          'pass' => $pass,
           'mail' => $mail,
           'status' => 1,);
       $newuser = user_save('', $userfields, 'account');
       // Terminate if an error occured during user_save().
       if (!$newuser) {
-        drupal_set_message(t("Error saving user account."), 'error');
+        drupal_set_message(t('Error creating user account.'), 'error');
         $form_state['redirect'] = '';
         return;
       }
-      dsm('no existe usuario con este mail, se ha creado');
-      // TODO: Enviar mail de nueva cuenta creada
-      // TODO: mostrar mensaje de nueva cuentra creada
+      // Now that we created a user we send him the welcome mail from user modules
+      dpm($newuser);
+      $newuser->password = $pass; // psw in pain text for email
+      $params['account'] = $newuser;
+      $language = NULL;
+      
+      drupal_mail('user', 'register_no_approval_required', $language, $params);
+      
+      drupal_set_message(t('Your password and further instructions have been sent to your e-mail address'), 'status');
+      watchdog('regcode_block', 'Account with uid = @uid has been created to validate a code', array('@uid' => $newuser->uid), 'WATCHDOG_NOTICE', url('user/' . $newuser->uid));
     }
     else {
       $account = $user_exist;
+      //TODO: quitar esto
       dsm('exite usuario asociado a este mail');
     }
   }
   else{
     $account = $user;
+    //TODO: quitar esto
     dsm('usuario autentificado');
   }
   
@@ -190,9 +200,6 @@ function regcode_block_form_alter(&$form, &$form_state, $form_id) {
 
 // TODO ocultar en /user/register el campo de código promocional
   if($form_id == 'user_register'){
-    dsm($form);
+    dpm($form);
   }
 }
-
-
-
