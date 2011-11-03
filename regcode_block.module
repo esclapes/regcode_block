@@ -172,7 +172,8 @@ function regcode_block_submit($form, $form_state) {
       drupal_mail('user', 'register_no_approval_required', $newuser->mail, $language, $params);
       
       drupal_set_message(t('Your password and further instructions have been sent to your e-mail address'), 'status');
-      watchdog('regcode_block', 'Account with uid = @uid has been created to validate a code', array('@uid' => $newuser->uid), 'WATCHDOG_NOTICE', url('user/' . $newuser->uid));
+      watchdog('regcode_block', 'An account created to validate a code: !user', array('!user' => l($newuser->name, 'user/' . $newuser->uid)), 'WATCHDOG_NOTICE', l(t('edit'), 'user/' . $newuser->uid . '/edit'));
+      $account = $newuser;
     }
     else {
       $account = $user_exist;
