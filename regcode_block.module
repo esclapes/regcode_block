@@ -173,13 +173,13 @@ function regcode_block_submit($form, $form_state) {
       $language = NULL;
       drupal_mail('user', 'register_no_approval_required', $newuser->mail, $language, $params);
       
-      drupal_set_message(t('Your password and further instructions have been sent to your e-mail address'), 'status');
+      drupal_set_message(t('New account created for !email. Check you inbox for your passwords and further instructions', array('!email' => $newuser->mail)), 'status');
       watchdog('regcode_block', 'Account created to validate a code: !user', array('!user' => l($newuser->name, 'user/' . $newuser->uid)), 'WATCHDOG_NOTICE', l(t('view user'), 'user/' . $newuser->uid));
       $account = $newuser;
     }
     else {
       $account = $user_exist;
-      drupal_set_message(t('Your password and further instructions have been sent to your e-mail address'), 'status');
+      drupal_set_message(t('There is an existing account with email: !email. This registration code will be applied to that account.', array('!email' => $account->mail)), 'status');
       watchdog('regcode_block', 'Annonymous user is using an existing account email to validate a code: !user', array('!user' => l($account->name, 'user/' . $account->uid)), 'WATCHDOG_NOTICE', l(t('view user'), 'user/' . $account->uid));
     }
   }
@@ -189,9 +189,10 @@ function regcode_block_submit($form, $form_state) {
   
 // We use the helper function provided by regcode so all the hooks are called properly
   $code = regcode_use_helper($edit, $account);
-  if (is_object($code)) {
-    drupal_set_message(variable_get('regcode_voucher_message', t('Voucher code used successfully')));
-  }
+// TODO: For this case we use a message sent by rules, this could be configured in the future admin page for regcode_blcok  
+//  if (is_object($code)) {
+//    drupal_set_message(variable_get('regcode_voucher_message', t('Voucher code used successfully')));
+//  }
 }
 
 /**
