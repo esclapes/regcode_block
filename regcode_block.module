@@ -175,13 +175,13 @@ function regcode_block_submit($form, $form_state) {
       drupal_mail('user', 'register_no_approval_required', $newuser->mail, $language, $params);
 
       drupal_set_message(t('New account created for !email. Check you inbox for your passwords and further instructions', array('!email' => $newuser->mail)), 'status');
-      watchdog('regcode_block', 'Account created to validate a code: !user', array('!user' => l($newuser->name, 'user/' . $newuser->uid)), 'WATCHDOG_NOTICE', l(t('view user'), 'user/' . $newuser->uid), NULL);
+      watchdog('regcode_block', 'Account created to validate a code: !user', array('!user' => l($newuser->name, 'user/' . $newuser->uid)), WATCHDOG_NOTICE, l(t('view user'), 'user/' . $newuser->uid));
       $account = $newuser;
     }
     else {
       $account = $user_exist;
       drupal_set_message(t('There is an existing account with email: !email. This registration code will be applied to that account.', array('!email' => $account->mail)), 'status');
-      watchdog('regcode_block', 'Annonymous user is using an existing account email to validate a code: !user', array('!user' => l($account->name, 'user/' . $account->uid)), 'WATCHDOG_NOTICE', l(t('view user'), 'user/' . $account->uid), NULL);
+      watchdog('regcode_block', 'Annonymous user is using an existing account email to validate a code: !user', array('!user' => l($account->name, 'user/' . $account->uid)), 'WATCHDOG_NOTICE', l(t('view user'), 'user/' . $account->uid));
     }
   }
   else{
@@ -237,16 +237,15 @@ function regcode_block_get_datos_personales($account) {
     //   $hostname = check_plain(trim($hostname));
     //   $profile_node->contentsync[$hostname] = TRUE;
     // }
-dpm($profile_node);
+
     node_save($profile_node);
-dpm($profile_node);
+
     $dp_node = content_profile_load('datos_personales', $account->uid, '', TRUE);
-    dpm($dp_node);
+
     return $dp_node;
   } 
   else {
-    dpm ('exists');
-    dpm ($profile_exist);
+
     return $profile_exist;
     
   }
